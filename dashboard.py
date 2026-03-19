@@ -5,6 +5,25 @@ import matplotlib.pyplot as plt
 st.title("🚀 Naman's AI Project Auditor")
 st.write("This dashboard automatically analyzes project risks and budget.")
 
+# --- ADD THIS SIDEBAR SECTION ---
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=100) # Professional Icon
+    st.title("Engineer Profile")
+    st.markdown("---")
+    st.write("**Name:** Naman")
+    st.write("**Role:** Data Science & Viz Engineer")
+    st.write("**Exp:** 7+ Years")
+    
+    st.info("""
+    Specializing in turning complex datasets 
+    into interactive visual stories using 
+    Python, SQL, and GenAI.
+    """)
+    
+    st.markdown("---")
+    st.write("📍 Based in India")
+    st.write("📧 [Contact me via GitHub](https://github.com/namansharma-23)") # Update with your link
+
 df=pd.read_csv("projects.csv")
 df["Budget"]=df["Budget"].fillna(0)
 
