@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import mean_absolute_error, accuracy_score
 
+st.set_page_data = "wide"
 st.title("🚀 Naman's AI Project Auditor")
 st.write("This dashboard automatically analyzes project risks and budget.")
 
@@ -50,24 +51,22 @@ st.markdown("---")
 st.header("🔮 Project Predictor (AI Model)")
 st.info("Adjust the sliders to see how Team Size and Duration affect project risk.")
 
-# --- SMART MODEL LOADER ---
+# --- SMART MODEL LOADER (V3: Categorical & Feature Sync) ---
 @st.cache_resource 
 def get_trained_models_with_metrics():
     try:
-        tdf = pd.read_csv("project_training.csv", index_col=False)
+        tdf = pd.read_csv("project_training.csv")
         # Ensure Project_Type is encoded
         tdf_encoded = pd.get_dummies(tdf, columns=["Project_Type"])
         
-        # FIX: Ensure names match your CSV exactly (Actual_Cost with underscore)
-        # We also drop 'Project' if it exists in your training file
-        X = tdf_encoded.drop(columns=["Actual_Cost", "On_Time"], errors='ignore')
-        if 'Project' in X.columns: X = X.drop(columns=['Project'])
-            
+        # Drop targets and irrelevant columns
+        # We use errors='ignore' so it doesn't crash if columns are missing
+        X = tdf_encoded.drop(columns=["Actual_Cost", "On_Time", "Project"], errors='ignore')
         y_cost = tdf_encoded['Actual_Cost']
         y_time = tdf_encoded['On_Time']
         
-        # Save column order to keep AI from getting "dizzy"
-        model_columns = list(X.columns)
+        # SAVE THE COLUMN NAMES - This is critical for the chart length
+        model_cols = list(X.columns)
         
         X_train, X_test, y_train, y_test = train_test_split(X, y_cost, test_size=0.2, random_state=42)
         c_model = LinearRegression().fit(X_train, y_train)
@@ -77,15 +76,15 @@ def get_trained_models_with_metrics():
         t_model = LogisticRegression().fit(X_train_l, y_train_l)
         time_accuracy = accuracy_score(y_test_l, t_model.predict(X_test_l))
         
-        return c_model, t_model, cost_error, time_accuracy, model_columns
+        return c_model, t_model, cost_error, time_accuracy, model_cols
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Model Loading Error: {e}")
         return None, None, 0, 0, []
 
-# Call it with the extra 'cols' variable
+# Initialize
 cost_model, time_model, mae, acc, cols = get_trained_models_with_metrics()
 
-# --- PREDICTION LOGIC (Everything moved inside here) ---
+# --- PREDICTION LOGIC ---
 if cost_model and time_model:
     col_in1, col_in2 = st.columns(2)
     with col_in1:
@@ -93,18 +92,19 @@ if cost_model and time_model:
     with col_in2:
         input_team = st.slider("Team Size", 1, 20, 5)
 
-    project_types=["Web", "Mobile", "ML_Model", "Audit"]
-    selected_type=st.selectbox("What type of Project is this?",project_types)
+    project_types = ["Web", "Mobile", "ML_Model", "Audit"]
+    selected_type = st.selectbox("What type of Project is this?", project_types)
     
+    # Build the "Switchboard" dictionary
     input_data = {'Days': input_days, 'Team_Size': input_team}
-    for p_type in ["Web", "Mobile", "ML_Model", "Audit"]:
+    for p_type in project_types:
         input_data[f'Project_Type_{p_type}'] = 1 if p_type == selected_type else 0
 
-    # FIX: Convert to DataFrame and FORCE the column order to match training
+    # Convert to DataFrame and ALIGN columns with the training set
     feature_df = pd.DataFrame([input_data])
-    feature_df = feature_df.reindex(columns=cols, fill_value=0) # This aligns everything!
+    feature_df = feature_df.reindex(columns=cols, fill_value=0)
 
-    # Calculate Predictions (Using the corrected variable name)
+    # Calculate Predictions
     pred_cost = cost_model.predict(feature_df)[0]
     pred_time = time_model.predict(feature_df)[0]
 
@@ -131,26 +131,21 @@ if cost_model and time_model:
     st.subheader("💡 What drives the Cost?")
     st.write("This chart shows which factor has the biggest impact on your budget.")
     
-    # Create the data for the chart
-    # # We use absolute values to show 'Impact' regardless of direction
+    # FIXED: The number of Factors must match the number of Coefficients
     importance_df = pd.DataFrame({
-    'Factor': ['Project Duration', 'Team Size'],
-    'Impact Score': np.abs(cost_model.coef_)
+        'Factor': cols,
+        'Impact Score': np.abs(cost_model.coef_)
     })
-    # Sort it so the biggest impact is at the top
+    
     importance_df = importance_df.sort_values(by='Impact Score', ascending=False)
-    
-    # Display a horizontal bar chart
     st.bar_chart(data=importance_df, x='Factor', y='Impact Score', color='#FF4B4B')
-    
-    st.caption("Note: A higher score means that changing this factor causes a larger shift in the predicted budget.")
+    st.caption("Note: Higher bars indicate a larger impact on the final budget prediction.")
 
-    # --- PDF GENERATOR (Inside the loop) ---
+    # --- PDF GENERATOR ---
     def create_pdf(days, team, cost, t_status):
         pdf = FPDF()
         pdf.add_page()
         try:
-            # Note: Adding image AFTER add_page() to prevent errors
             pdf.image("naman_logo.jpg", 10, 8, 33) 
         except:
             pass
@@ -181,7 +176,7 @@ if cost_model and time_model:
         mime="application/pdf"
     )
 else:
-    st.warning("Please ensure 'project_training.csv' is uploaded to GitHub.")
+    st.warning("Please ensure 'project_training.csv' is correctly formatted on GitHub.")
 
 # --- SIDEBAR ---
 with st.sidebar:
