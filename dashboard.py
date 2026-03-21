@@ -63,6 +63,9 @@ def get_trained_models_with_metrics():
         c_model = LinearRegression().fit(X_train, y_train)
         cost_error = mean_absolute_error(y_test, c_model.predict(X_test))
         
+        importances = c_model.coef_ 
+        feature_names = X.columns
+        
         X_train_l, X_test_l, y_train_l, y_test_l = train_test_split(X, y_time, test_size=0.4, random_state=42)
         t_model = LogisticRegression().fit(X_train_l, y_train_l)
         time_accuracy = accuracy_score(y_test_l, t_model.predict(X_test_l))
@@ -104,6 +107,24 @@ if cost_model and time_model:
         st.write(f"**Cost Reliability:** ±${mae:.0f}")
     with conf_col2:
         st.write(f"**Risk Accuracy:** {acc*100:.0f}%")
+
+    st.divider()
+    st.subheader("💡 What drives the Cost?")
+    st.write("This chart shows which factor has the biggest impact on your budget.")
+    
+    # Create the data for the chart
+    # # We use absolute values to show 'Impact' regardless of direction
+    importance_df = pd.DataFrame({
+    'Factor': ['Project Duration', 'Team Size'],
+    'Impact Score': np.abs(cost_model.coef_)
+    })
+    # Sort it so the biggest impact is at the top
+    importance_df = importance_df.sort_values(by='Impact Score', ascending=False)
+    
+    # Display a horizontal bar chart
+    st.bar_chart(data=importance_df, x='Factor', y='Impact Score', color='#FF4B4B')
+    
+    st.caption("Note: A higher score means that changing this factor causes a larger shift in the predicted budget.")
 
     # --- PDF GENERATOR (Inside the loop) ---
     def create_pdf(days, team, cost, t_status):
