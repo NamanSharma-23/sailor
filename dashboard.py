@@ -1,156 +1,153 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import pickle
 import numpy as np
 from fpdf import FPDF
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import mean_absolute_error, accuracy_score
 
 st.title("🚀 Naman's AI Project Auditor")
 st.write("This dashboard automatically analyzes project risks and budget.")
 
-df=pd.read_csv("projects.csv")
-df["Budget"]=df["Budget"].fillna(0)
+# --- DATA LOADING ---
+df = pd.read_csv("projects.csv")
+df["Budget"] = df["Budget"].fillna(0)
 
 def analyze_risk(budget):
     if budget > 10000: return "🔴 High Risk"
     if budget > 5000: return "🟡 Medium Risk"
     return "🟢 Low Risk"
 
-df["Risk_Level"]=df["Budget"].apply(analyze_risk)
+df["Risk_Level"] = df["Budget"].apply(analyze_risk)
 
+# --- METRICS ---
 col1, col2, col3 = st.columns(3)
-
 with col1:
     st.metric("Total Projects", len(df))
-
 with col2:
-    total_budget=df["Budget"].sum()
+    total_budget = df["Budget"].sum()
     st.metric("Total Budget", f"${total_budget:,.0f}")
-
 with col3:
-    high_risk_count=len(df[df["Risk_Level"]=="🔴 High Risk"])
-    st.metric("High Risk Alerts", high_risk_count, delta="- Action Required", delta_color="inverse")
+    high_risk_count = len(df[df["Risk_Level"] == "🔴 High Risk"])
+    st.metric("High Risk Alerts", high_risk_count)
 
 st.divider()
-
 st.subheader("Project Data Overview")
 st.dataframe(df, use_container_width=True)
 
 st.subheader("Budget Visualizer")
-fig, ax=plt.subplots()
-ax.bar(df["Project"],df["Budget"],color='skyblue')
+fig, ax = plt.subplots()
+ax.bar(df["Project"], df["Budget"], color='skyblue')
 st.pyplot(fig)
 
 st.divider()
 selected_project = st.selectbox("Select a project to audit: ", df["Project"])
-project_info=df[df["Project"]==selected_project]
+project_info = df[df["Project"] == selected_project]
 st.write(f"The AI suggests: **{project_info['Risk_Level'].values[0]}**")
 
 st.markdown("---")
-
 st.header("🔮 Project Predictor (AI Model)")
 st.info("Adjust the sliders to see how Team Size and Duration affect project risk.")
 
-# --- SMART MODEL LOADER (Fixes NumPy version errors) ---
+# --- SMART MODEL LOADER ---
 @st.cache_resource 
-def get_trained_models():
+def get_trained_models_with_metrics():
     try:
-        # Uses your project_training.csv from GitHub
-        training_df = pd.read_csv("project_training.csv")
-        X_train = training_df[['Days', 'Team_Size']]
+        tdf = pd.read_csv("project_training.csv")
+        X = tdf[['Days', 'Team_Size']]
+        y_cost = tdf['Actual_Cost']
+        y_time = tdf['On_Time']
         
-        # Train fresh models on the server environment
-        from sklearn.linear_model import LinearRegression, LogisticRegression
-        c_model = LinearRegression().fit(X_train, training_df['Actual_Cost'])
-        t_model = LogisticRegression().fit(X_train, training_df['On_Time'])
-        return c_model, t_model
-    except Exception as e:
-        return None, None
+        X_train, X_test, y_train, y_test = train_test_split(X, y_cost, test_size=0.2, random_state=42)
+        c_model = LinearRegression().fit(X_train, y_train)
+        cost_error = mean_absolute_error(y_test, c_model.predict(X_test))
+        
+        X_train_l, X_test_l, y_train_l, y_test_l = train_test_split(X, y_time, test_size=0.4, random_state=42)
+        t_model = LogisticRegression().fit(X_train_l, y_train_l)
+        time_accuracy = accuracy_score(y_test_l, t_model.predict(X_test_l))
+        
+        return c_model, t_model, cost_error, time_accuracy
+    except:
+        return None, None, 0, 0
 
-# Initialize the models
-cost_model, time_model = get_trained_models()
+cost_model, time_model, mae, acc = get_trained_models_with_metrics()
 
+# --- PREDICTION LOGIC (Everything moved inside here) ---
 if cost_model and time_model:
-    col_input1, col_input2 = st.columns(2)
-    with col_input1:
+    col_in1, col_in2 = st.columns(2)
+    with col_in1:
         input_days = st.slider("Project Duration (Days)", 1, 150, 40)
-    with col_input2:
+    with col_in2:
         input_team = st.slider("Team Size", 1, 20, 5)
 
-    # Calculation
+    # Calculate Predictions
     features = np.array([[input_days, input_team]])
     pred_cost = cost_model.predict(features)[0]
     pred_time = time_model.predict(features)[0]
 
-    # Visualizing the Result
+    # Metrics Display
     res_col1, res_col2 = st.columns(2)
     res_col1.metric("Predicted Budget", f"${pred_cost:,.2f}")
     
     if pred_time == 1:
         res_col2.success("Status: Likely On-Time")
+        time_label = "On-Time"
     else:
         res_col2.error("Status: High Risk of Delay")
+        time_label = "Delayed/High Risk"
+
+    # AI Confidence
+    st.markdown("### 📊 AI Model Confidence")
+    conf_col1, conf_col2 = st.columns(2)
+    with conf_col1:
+        st.write(f"**Cost Reliability:** ±${mae:.0f}")
+    with conf_col2:
+        st.write(f"**Risk Accuracy:** {acc*100:.0f}%")
+
+    # --- PDF GENERATOR (Inside the loop) ---
+    def create_pdf(days, team, cost, t_status):
+        pdf = FPDF()
+        pdf.add_page()
+        try:
+            # Note: Adding image AFTER add_page() to prevent errors
+            pdf.image("naman_logo.jpg", 10, 8, 33) 
+        except:
+            pass
+            
+        pdf.set_font("Arial", 'B', 16)
+        pdf.ln(20) 
+        pdf.cell(200, 10, "Project Audit Report", ln=True, align='C')
+        pdf.set_draw_color(0, 80, 180)
+        pdf.line(10, 40, 200, 40)
+        pdf.ln(10)
+
+        pdf.set_font("Arial", size=12)
+        pdf.cell(200, 10, f"Project Duration: {days} Days", ln=True)
+        pdf.cell(200, 10, f"Team Size: {team} Members", ln=True)
+        pdf.cell(200, 10, f"Predicted Budget: ${cost:,.2f}", ln=True)
+        pdf.cell(200, 10, f"Timeline Status: {t_status}", ln=True)
+        
+        pdf.ln(20)
+        pdf.set_font("Arial", 'I', 10)
+        pdf.cell(200, 10, "Generated by Naman's AI Project Auditor", ln=True, align='C')
+        return pdf.output(dest='S').encode('latin-1')
+
+    pdf_data = create_pdf(input_days, input_team, pred_cost, time_label)
+    st.download_button(
+        label="📥 Download Audit Report (PDF)",
+        data=pdf_data,
+        file_name="project_audit.pdf",
+        mime="application/pdf"
+    )
 else:
-    st.warning("Please ensure 'project_training.csv' is uploaded to GitHub to enable AI predictions.")
+    st.warning("Please ensure 'project_training.csv' is uploaded to GitHub.")
 
-# --- PDF GENERATOR FUNCTION ---
-def create_pdf(days, team, cost, time_status):
-    pdf = FPDF()
-
-# ADD LOGO HERE (Ensure 'logo.png' is in your GitHub folder!)
-    # Parameters: (File path, X-position, Y-position, Width)
-    try:
-        pdf.image("naman_logo.jpg", 10, 8, 33) 
-    except:
-        pass # If logo is missing, it just skips it instead of crashing
-
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(200, 10, "Project Audit Report", ln=True, align='C')
-    pdf.ln(10)
-
-    pdf.set_draw_color(0, 80, 180) # Professional Blue
-    pdf.line(10, 30, 200, 30) # Draw a line from left to right
-    pdf.ln(20) # Add some space
-    
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, f"Project Duration: {days} Days", ln=True)
-    pdf.cell(200, 10, f"Team Size: {team} Members", ln=True)
-    pdf.cell(200, 10, f"Predicted Budget: ${cost:,.2f}", ln=True)
-    pdf.cell(200, 10, f"Timeline Status: {time_status}", ln=True)
-    
-    pdf.ln(20)
-    pdf.set_font("Arial", 'I', 10)
-    pdf.cell(200, 10, "Generated by Naman's AI Project Auditor", ln=True, align='C')
-    
-    return pdf.output(dest='S').encode('latin-1')
-
-# --- THE DOWNLOAD BUTTON ---
-time_label = "On-Time" if pred_time == 1 else "Delayed/High Risk"
-pdf_data = create_pdf(input_days, input_team, pred_cost, time_label)
-
-st.download_button(
-    label="📥 Download Audit Report (PDF)",
-    data=pdf_data,
-    file_name="project_audit.pdf",
-    mime="application/pdf"
-)
-
-# --- ADD THIS SIDEBAR SECTION ---
+# --- SIDEBAR ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=100) # Professional Icon
+    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=100)
     st.title("Engineer Profile")
-    st.markdown("---")
     st.write("**Name:** Naman")
     st.write("**Role:** Data Science & Viz Engineer")
-    st.write("**Exp:** 7+ Years")
-    
-    st.info("""
-    Specializing in turning complex datasets 
-    into interactive visual stories using 
-    Python, SQL, and GenAI.
-    """)
-    
-    st.markdown("---")
+    st.info("Turning complex datasets into interactive visual stories.")
     st.write("📍 Based in India")
-    st.write("📧 [Contact me via GitHub](https://github.com/namansharma-23)") # Update with your link
