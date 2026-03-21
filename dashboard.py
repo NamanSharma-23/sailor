@@ -7,6 +7,37 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import mean_absolute_error, accuracy_score
 
+import requests
+import base64
+
+def save_to_github(new_row_list):
+    # 1. Setup GitHub Details
+    token = st.secrets["GITHUB_TOKEN"]
+    repo = "namansharma-23/project-auditor-ai" # Ensure this matches your repo name
+    path = "project_training.csv"
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {"Authorization": f"token {token}"}
+
+    # 2. Get the current file content
+    resp = requests.get(url, headers=headers).json()
+    content = base64.b64decode(resp['content']).decode('utf-8')
+    sha = resp['sha'] # GitHub needs this 'sha' to know which version to update
+
+    # 3. Add the new data row
+    new_row_str = ",".join(map(str, new_row_list))
+    updated_content = content.strip() + "\n" + new_row_str
+
+    # 4. Push back to GitHub
+    message = "New project data added via AI Dashboard"
+    payload = {
+        "message": message,
+        "content": base64.b64encode(updated_content.encode('utf-8')).decode('utf-8'),
+        "sha": sha
+    }
+    
+    r = requests.put(url, json=payload, headers=headers)
+    return r.status_code == 200
+
 st.set_page_data = "wide"
 st.title("🚀 Naman's AI Project Auditor")
 st.write("This dashboard automatically analyzes project risks and budget.")
@@ -209,5 +240,17 @@ with st.sidebar:
         
         submitted = st.form_submit_button("Add to Training Set")
         if submitted:
-            # Logic to append to CSV (We will build this next!)
+            # Create the list in the same order as your CSV: Days, Team, Cost, On_Time, Type
+            new_data = [new_days, new_team, new_cost, new_ontime, new_type]
+            
+            with st.spinner("Writing to GitHub..."):
+                success = save_to_github(new_data)
+                
+            if success:
+                st.success("✅ Project saved! Refresh the page to retrain the AI.")
+                # Clear cache so the AI reloads the new CSV
+                st.cache_resource.clear() 
+            else:
+                st.error("❌ Failed to save. Check your GitHub Token.")
+                
             st.success("Project added! The AI will learn from this on the next refresh.")
