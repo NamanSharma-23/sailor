@@ -96,6 +96,14 @@ else:
 # --- PDF GENERATOR FUNCTION ---
 def create_pdf(days, team, cost, time_status):
     pdf = FPDF()
+
+# ADD LOGO HERE (Ensure 'logo.png' is in your GitHub folder!)
+    # Parameters: (File path, X-position, Y-position, Width)
+    try:
+        pdf.image("Naman_logo.png", 10, 8, 33) 
+    except:
+        pass # If logo is missing, it just skips it instead of crashing
+
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(200, 10, "Project Audit Report", ln=True, align='C')
