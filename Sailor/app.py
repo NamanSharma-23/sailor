@@ -55,4 +55,4 @@ target_city = st.selectbox("Write to a Penpal in:", ["London", "New York", "Toky
 if my_city == target_city:
     st.warning("Try writing to someone in a different city to experience the 'Snail' delay!")
 
-letter_body = st.text_area("Your Message:", placeholder="Dear Friend, I hope this letter finds you well...", height
+letter_body = st.text_area("Your Message:", placeholder="Dear Friend, I hope this letter finds you well. Qrite back soon...", height
