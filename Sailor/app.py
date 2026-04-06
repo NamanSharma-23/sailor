@@ -14,7 +14,7 @@ st.markdown(
 .stTextArea textarea { font-family: 'Georgia', serif; background-color: #fffdfa; }
 </style>
     """, 
-    unsafe_allow_name_with_html=True
+    unsafe_allow_html=True
 )
 
 # --- STEP 3: THE "RELIABILITY" ENGINE (Core Logic) ---
