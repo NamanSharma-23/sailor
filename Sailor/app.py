@@ -6,12 +6,16 @@ import math
 st.set_page_config(page_title="The Snail's Pace", page_icon="🐌", layout="centered")
 
 # --- STEP 2: STYLED CSS (For that 'Classical' feel) ---
-st.markdown("""
-    <style>
-    .main { background-color: #fdfaf5; }
-    .stTextArea textarea { font-family: 'Georgia', serif; background-color: #fffdfa; }
-    </style>
-    """, unsafe_allow_name_with_html=True)
+# --- STEP 2: STYLED CSS ---
+st.markdown(
+    """
+<style>
+.main { background-color: #fdfaf5; }
+.stTextArea textarea { font-family: 'Georgia', serif; background-color: #fffdfa; }
+</style>
+    """, 
+    unsafe_allow_name_with_html=True
+)
 
 # --- STEP 3: THE "RELIABILITY" ENGINE (Core Logic) ---
 def get_delivery_info(city_from, city_to):
