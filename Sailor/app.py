@@ -3,19 +3,36 @@ import datetime
 import math
 
 # --- STEP 1: UI CONFIG ---
-st.set_page_config(page_title="The Snail's Pace", page_icon="🐌", layout="centered")
+st.set_page_config(page_title="The Snail's Pace", page_icon="🐌")
 
-# --- STEP 2: STYLED CSS (For that 'Classical' feel) ---
-# --- STEP 2: STYLED CSS ---
-st.markdown(
-    """
-<style>
-.main { background-color: #fdfaf5; }
-.stTextArea textarea { font-family: 'Georgia', serif; background-color: #fffdfa; }
-</style>
-    """, 
-    unsafe_allow_html=True
-)
+# --- STEP 2: STYLED CSS (Place this early!) ---
+st.markdown("""
+    <style>
+    /* This changes the main background to a warm parchment color */
+    .stApp {
+        background-color: #f4ece1;
+    }
+    
+    /* This styles the text area to look like a high-quality letter */
+    .stTextArea textarea {
+        font-family: 'Georgia', serif;
+        background-color: #fff9f0;
+        color: #2c1e11;
+        border: 2px solid #d4af37; /* A subtle gold border */
+        border-radius: 5px;
+    }
+
+    /* Styling the headers to be more classical */
+    h1, h2, h3 {
+        font-family: 'Garamond', serif;
+        color: #5d4037;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- STEP 3: REST OF YOUR CODE ---
+st.title("🐌 The Snail's Pace")
+# ... your city selectors and logic follow here ...
 
 # --- STEP 3: THE "RELIABILITY" ENGINE (Core Logic) ---
 def get_delivery_info(city_from, city_to):
